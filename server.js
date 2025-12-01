@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+// Initialize Firebase Admin SDK (will read env vars for credentials)
+require('./services/firebaseAdmin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
