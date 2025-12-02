@@ -115,7 +115,10 @@ router.post('/signup', async (req, res) => {
           lastName: user.lastName,
           email: user.email,
           mobileNumber: user.mobileNumber,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
+          subscriptionType: user.subscriptionType,
+          subscriptionStatus: user.subscriptionStatus,
+          isProUser: user.isProUser
         },
         token
       }
@@ -186,7 +189,10 @@ router.post('/login', async (req, res) => {
           lastName: user.lastName,
           email: user.email,
           mobileNumber: user.mobileNumber,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
+          subscriptionType: user.subscriptionType,
+          subscriptionStatus: user.subscriptionStatus,
+          isProUser: user.isProUser
         },
         token
       }
@@ -204,6 +210,92 @@ router.post('/login', async (req, res) => {
       });
     }
     
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update user subscription status (Admin only for testing)
+router.put('/admin/update-subscription/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { subscriptionType, isProUser } = req.body;
+    
+    // Validation schema for subscription update
+    const subscriptionUpdateSchema = Joi.object({
+      subscriptionType: Joi.string().valid('free', 'pro', 'enterprise').required(),
+      isProUser: Joi.boolean().required()
+    });
+    
+    const { error } = subscriptionUpdateSchema.validate({ subscriptionType, isProUser });
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message
+      });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Update subscription details
+    user.subscriptionType = subscriptionType;
+    user.isProUser = isProUser;
+    
+    if (subscriptionType !== 'free') {
+      user.subscriptionStatus = 'active';
+    }
+    
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'User subscription updated successfully',
+      data: {
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          subscriptionType: user.subscriptionType,
+          isProUser: user.isProUser,
+          subscriptionStatus: user.subscriptionStatus
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Update subscription error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get all users (Admin only for testing)
+router.get('/admin/users', async (req, res) => {
+  try {
+    const users = await User.find({}, '-password').sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        users
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get users error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',

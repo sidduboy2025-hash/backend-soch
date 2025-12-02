@@ -41,7 +41,29 @@ const userSchema = new mongoose.Schema({
   uploadedModels: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Model'
-  }]
+  }],
+  subscriptionType: {
+    type: String,
+    enum: ['free', 'pro', 'enterprise'],
+    default: 'free'
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['active', 'inactive', 'cancelled', 'trial'],
+    default: 'active'
+  },
+  subscriptionStartDate: {
+    type: Date,
+    default: Date.now
+  },
+  subscriptionEndDate: {
+    type: Date,
+    default: null
+  },
+  isProUser: {
+    type: Boolean,
+    default: false
+  }
 }, {
   timestamps: true
 });
