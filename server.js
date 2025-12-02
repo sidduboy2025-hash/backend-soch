@@ -28,6 +28,7 @@ const checkDatabaseConnection = (req, res, next) => {
 // Import routes
 const authRoutes = require('./routes/auth');
 const modelRoutes = require('./routes/models');
+const testRoutes = require('./routes/test');
 
 // MongoDB Connection
 const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sochai-backend';
@@ -52,6 +53,9 @@ app.use('/api/auth', checkDatabaseConnection, authRoutes);
 
 // Model routes (protected with database connection check)
 app.use('/api/models', checkDatabaseConnection, modelRoutes);
+
+// Test routes (for development only)
+app.use('/api/test', checkDatabaseConnection, testRoutes);
 
 // Simple POST API that returns "Hello World"
 app.post('/api/hello', (req, res) => {

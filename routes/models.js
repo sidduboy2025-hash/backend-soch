@@ -72,6 +72,14 @@ const modelSchema = Joi.object({
 // POST /api/models - Upload a new AI model (Protected)
 router.post('/', authenticateToken, async (req, res) => {
   try {
+    // Check if user is a pro user
+    if (!req.user.isProUser) {
+      return res.status(403).json({
+        success: false,
+        message: 'Pro subscription required to upload models. Please upgrade your subscription to continue.'
+      });
+    }
+
     // Validate input data
     const { error, value } = modelSchema.validate(req.body);
     if (error) {

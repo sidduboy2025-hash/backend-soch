@@ -287,15 +287,75 @@ router.get('/admin/users', async (req, res) => {
   try {
     const users = await User.find({}, '-password').sort({ createdAt: -1 });
     
+    // Map users to include id field for frontend compatibility
+    const mappedUsers = users.map(user => ({
+      ...user.toObject(),
+      id: user._id
+    }));
+    
     res.status(200).json({
       success: true,
       data: {
-        users
+        users: mappedUsers
       }
     });
     
   } catch (error) {
     console.error('Get users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Toggle user subscription status (Admin only for testing)
+router.put('/admin/toggle-subscription/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Toggle between free and pro
+    const newIsProUser = !user.isProUser;
+    const newSubscriptionType = newIsProUser ? 'pro' : 'free';
+    
+    // Update user subscription
+    user.subscriptionType = newSubscriptionType;
+    user.isProUser = newIsProUser;
+    
+    if (newSubscriptionType !== 'free') {
+      user.subscriptionStatus = 'active';
+    }
+    
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `User subscription toggled to ${newSubscriptionType}`,
+      data: {
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          subscriptionType: user.subscriptionType,
+          isProUser: user.isProUser,
+          subscriptionStatus: user.subscriptionStatus,
+          createdAt: user.createdAt
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Toggle subscription error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
