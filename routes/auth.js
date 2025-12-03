@@ -376,11 +376,19 @@ router.put('/admin/toggle-subscription/:userId', async (req, res) => {
 // POST /api/auth/google-signin
 router.post('/google-signin', async (req, res) => {
   try {
+    // Add CORS headers explicitly for this route
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    console.log('Google signin request received from origin:', req.headers.origin);
+    console.log('Request headers:', req.headers);
+    
     const authHeader = req.headers['authorization'] || '';
     const matches = authHeader.match(/^Bearer (.*)$/);
     const idToken = matches ? matches[1] : null;
 
     if (!idToken) {
+      console.log('Missing Firebase ID token in request');
       return res.status(401).json({ 
         success: false, 
         message: 'Firebase ID token missing' 
@@ -479,7 +487,8 @@ router.post('/google-signin', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error during Google sign-in',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

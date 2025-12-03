@@ -12,22 +12,77 @@ const PORT = process.env.PORT || 5000;
 // Configure CORS - allow frontend(s) defined in env vars or default to localhost + the production frontend
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
-  'https://www.sochai.store'
+  'https://www.sochai.store',
+  'https://sochai.store',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:2000'
 ];
 
+// More permissive CORS for Google Auth issues
 const corsOptions = {
   origin: function (origin, callback) {
     // If no origin (e.g., server-to-server or same-origin), allow
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    if (!origin) {
+      console.log('CORS: No origin header, allowing request');
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+    
+    if (allowedOrigins.includes(origin)) {
+      console.log('CORS: Allowed origin:', origin);
+      return callback(null, true);
+    }
+    
+    // For development and debugging, log and allow all origins temporarily
+    console.log('CORS: Allowing origin for debugging:', origin);
+    return callback(null, true);
+    
+    // Uncomment this for production security:
+    // console.log('CORS: Blocked origin:', origin);
+    // return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Kuma-Revision'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 };
+
+// Apply CORS before any other middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    // Temporarily allow all origins for debugging
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('CORS: Handling preflight request from:', origin);
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
+
+// Apply the cors middleware as well for additional safety
+app.use(cors(corsOptions));
 
 // Ensure we allow popups to be checked for window.closed in cross-origin cases
 // If your hosting provider already sets Cross-Origin-Opener-Policy, this may
@@ -39,10 +94,6 @@ app.use((req, res, next) => {
   // resource loading issues and stricter cross-origin restrictions.
   next();
 });
-
-app.use(cors(corsOptions));
-// Enable preflight across all routes
-app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -104,6 +155,21 @@ app.post('/api/hello', (req, res) => {
     message: 'Hello World',
     timestamp: new Date().toISOString(),
     method: 'POST'
+  });
+});
+
+// CORS test endpoint
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    message: 'CORS test successful',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    allowedOrigins: [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      'https://www.sochai.store',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ]
   });
 });
 
