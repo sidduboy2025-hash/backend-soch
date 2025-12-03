@@ -19,70 +19,41 @@ const allowedOrigins = [
   'http://localhost:2000'
 ];
 
-// More permissive CORS for Google Auth issues
-const corsOptions = {
-  origin: function (origin, callback) {
-    // If no origin (e.g., server-to-server or same-origin), allow
-    if (!origin) {
-      console.log('CORS: No origin header, allowing request');
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.includes(origin)) {
-      console.log('CORS: Allowed origin:', origin);
-      return callback(null, true);
-    }
-    
-    // For development and debugging, log and allow all origins temporarily
-    console.log('CORS: Allowing origin for debugging:', origin);
-    return callback(null, true);
-    
-    // Uncomment this for production security:
-    // console.log('CORS: Blocked origin:', origin);
-    // return callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  credentials: true,
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  exposedHeaders: ['Content-Length', 'X-Kuma-Revision'],
-  preflightContinue: false,
-  optionsSuccessStatus: 200
-};
 
-// Apply CORS before any other middleware
+
+// CORS middleware - must be the very first middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (!origin || allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  } else {
-    // Temporarily allow all origins for debugging
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
+  console.log(`[${new Date().toISOString()}] CORS: ${req.method} ${req.path} from origin: ${origin}`);
   
-  // Handle preflight requests
+  // Always set CORS headers - be very explicit
+  res.setHeader('Access-Control-Allow-Origin', origin || 'https://www.sochai.store');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle preflight requests immediately and explicitly
   if (req.method === 'OPTIONS') {
-    console.log('CORS: Handling preflight request from:', origin);
-    res.status(200).end();
+    console.log(`[${new Date().toISOString()}] CORS: Preflight request for ${req.path} - responding with 200`);
+    res.status(200).send('OK');
     return;
   }
   
   next();
 });
 
-// Apply the cors middleware as well for additional safety
-app.use(cors(corsOptions));
+// Also apply express CORS as backup
+app.use(cors({
+  origin: function (origin, callback) {
+    console.log('Express CORS: Processing origin:', origin);
+    // Allow all origins for debugging
+    callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
 
 // Ensure we allow popups to be checked for window.closed in cross-origin cases
 // If your hosting provider already sets Cross-Origin-Opener-Policy, this may
@@ -129,6 +100,16 @@ const mongoOptions = {
   minPoolSize: 5
 };
 
+// Global OPTIONS handler for any missed preflight requests
+app.options('*', (req, res) => {
+  console.log(`[${new Date().toISOString()}] Global OPTIONS handler for: ${req.path}`);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || 'https://www.sochai.store');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).send('OK');
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ message: 'SochAI Backend API is running!' });
@@ -160,17 +141,20 @@ app.post('/api/hello', (req, res) => {
 
 // CORS test endpoint
 app.get('/api/cors-test', (req, res) => {
+  console.log('CORS test endpoint hit from origin:', req.headers.origin);
   res.json({
     message: 'CORS test successful',
     origin: req.headers.origin,
     timestamp: new Date().toISOString(),
-    allowedOrigins: [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      'https://www.sochai.store',
-      'http://localhost:3000',
-      'http://localhost:5173'
-    ]
+    method: req.method,
+    headers: req.headers
   });
+});
+
+// Simple OPTIONS handler for testing
+app.options('/api/cors-test', (req, res) => {
+  console.log('OPTIONS request for cors-test from:', req.headers.origin);
+  res.status(200).end();
 });
 
 // Health check endpoint
